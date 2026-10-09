@@ -1,0 +1,25 @@
+name: Bug
+description: Something in the app doesn't work as it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Screenshots help (hide amounts if you like).
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Tap …
+  - type: input
+    id: version
+    attributes:
+      label: PaiPai version, Android version and phone
+      placeholder: "e.g. PaiPai 1.8.0, Android 15, Pixel 7"
+    validations:
+      required: true

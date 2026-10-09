@@ -1,0 +1,15 @@
+name: Feature idea
+description: Suggest something PaiPai could do
+labels: ["idea"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would it help you with?
+      description: The situation or problem, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea

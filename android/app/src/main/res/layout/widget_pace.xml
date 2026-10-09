@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This month so far: spent, the pace chart (drawn as an image) and how it
+     compares with last month. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/pace_month"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="October so far"
+        android:textColor="@color/widget_muted"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/pace_spent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:text="₹12,450"
+        android:textColor="@color/widget_on_surface"
+        android:textSize="20sp" />
+
+    <!-- "₹17,707 left of ₹25,000", only with a monthly budget. -->
+    <TextView
+        android:id="@+id/pace_budget"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:text="₹17,707 left of ₹25,000"
+        android:textColor="@color/widget_primary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- The chart, with its amount scale on the right (labels sit on the
+         top, half-way and bottom lines the chart draws). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="4dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/pace_chart"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY" />
+
+        <FrameLayout
+            android:layout_width="@dimen/widget_axis_width"
+            android:layout_height="match_parent"
+            android:paddingStart="4dp">
+
+            <TextView
+                android:id="@+id/pace_axis_top"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="₹10K"
+                android:textColor="@color/widget_muted"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/pace_axis_mid"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical|start"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="₹5K"
+                android:textColor="@color/widget_muted"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/pace_axis_zero"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="₹0"
+                android:textColor="@color/widget_muted"
+                android:textSize="10sp" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Dates under the chart: the 1st, the middle and the last day. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="@dimen/widget_axis_width"
+        android:layout_marginBottom="4dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/pace_day_first"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="start"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="1 Oct"
+            android:textColor="@color/widget_muted"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/pace_day_mid"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="16"
+            android:textColor="@color/widget_muted"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/pace_day_last"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="31 Oct"
+            android:textColor="@color/widget_muted"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pace_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:text="₹800 less than by this day in September"
+        android:textColor="@color/widget_muted"
+        android:textSize="11sp" />
+</LinearLayout>
