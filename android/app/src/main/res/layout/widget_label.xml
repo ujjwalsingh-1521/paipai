@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Label payments: the next unlabelled payment with its suggested
+     categories and More (the same card as the notification's More).
+     Sized to fit one launcher row (about 90dp). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="8dp">
+
+    <LinearLayout
+        android:id="@+id/label_payment"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/label_open"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/label_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="₹340 paid · Swiggy"
+                android:textColor="@color/widget_on_surface"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/label_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="5 Oct · 2:15 PM"
+                android:textColor="@color/widget_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Tall enough to tap, though the text is small. -->
+        <TextView
+            android:id="@+id/label_next"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="2dp"
+            android:text="1/3 ›"
+            android:textColor="@color/widget_primary"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/label_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/label_button_1"
+            style="@style/WidgetPill"
+            android:text="Food" />
+
+        <TextView
+            android:id="@+id/label_button_2"
+            style="@style/WidgetPill"
+            android:layout_marginStart="6dp"
+            android:text="Groceries" />
+
+        <TextView
+            android:id="@+id/label_more"
+            style="@style/WidgetPill"
+            android:layout_marginStart="6dp"
+            android:text="More" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/label_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="✓  All payments labelled"
+        android:textColor="@color/widget_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>

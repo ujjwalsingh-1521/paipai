@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label_name">Label payments</string>
+    <string name="widget_label_description">Label a payment you forgot, right from the home screen</string>
+    <string name="widget_pace_name">This month so far</string>
+    <string name="widget_pace_description">Spending this month against last month</string>
+    <string name="widget_categories_name">Where it went</string>
+    <string name="widget_categories_description">This month\'s spending by category</string>
+    <string name="widget_add_name">Quick add</string>
+    <string name="widget_add_description">Add an expense or income without opening PaiPai</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The amount scale beside the "This month so far" chart. -->
+    <dimen name="widget_axis_width">32dp</dimen>
+</resources>

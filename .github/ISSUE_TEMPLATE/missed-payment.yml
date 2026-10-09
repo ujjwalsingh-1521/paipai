@@ -1,0 +1,45 @@
+name: Missed or misread payment
+description: PaiPai didn't catch a payment, or got the amount, shop or direction wrong
+labels: ["capture"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Remove personal details before posting.** Change account digits, names, UPI IDs and reference numbers to made-up ones, but keep their shape (`XX1234`, a 12-digit ref). This issue is public.
+  - type: input
+    id: source
+    attributes:
+      label: Bank or app
+      placeholder: "e.g. HDFC Bank SMS, PhonePe, Kotak 811 app, Swiggy email"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: It came as
+      options:
+        - SMS (in my Messages app)
+        - App notification
+        - Email
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: The message (anonymised)
+      description: The notification's title and text, exactly as shown apart from the personal details you changed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What PaiPai did
+      placeholder: "e.g. Nothing; showed ₹80 instead of ₹506; counted it twice; called it income"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PaiPai version and Android version
+      placeholder: "e.g. PaiPai 1.8.0, Android 15"

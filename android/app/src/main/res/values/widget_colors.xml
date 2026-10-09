@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget colors. Android 12+ uses the wallpaper's colors
+     instead (values-v31); these brand-blue tones are for older phones. -->
+<resources>
+    <color name="widget_surface">#FFF4F5FB</color>
+    <color name="widget_on_surface">#FF1A1B21</color>
+    <color name="widget_muted">#FF5B5F70</color>
+    <color name="widget_primary">#FF2C4FBD</color>
+    <color name="widget_on_primary">#FFFFFFFF</color>
+    <color name="widget_button">#FFDCE2FF</color>
+    <color name="widget_on_button">#FF0F1B4D</color>
+    <color name="widget_track">#FFE1E2EC</color>
+</resources>

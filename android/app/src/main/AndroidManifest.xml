@@ -1,0 +1,117 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Payment alerts. Reading notifications needs no permission here:
+         the user grants "Notification access" in Android settings. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <application
+        android:label="PaiPai"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- "More" on a payment alert: a see-through card over the current app. -->
+        <activity
+            android:name=".QuickPickActivity"
+            android:exported="false"
+            android:taskAffinity="com.expense.expense_tracker.quickpick"
+            android:excludeFromRecents="true"
+            android:theme="@style/QuickPickTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"/>
+
+        <!-- Receives payment notifications (bank SMS, UPI apps, email alerts). -->
+        <service
+            android:name=".PaymentNotificationListener"
+            android:label="PaiPai payment capture"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService"/>
+            </intent-filter>
+        </service>
+
+        <!-- Home-screen widgets (PaiPaiWidgets.kt). -->
+        <receiver
+            android:name=".LabelWidget"
+            android:exported="false"
+            android:label="@string/widget_label_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_label_info"/>
+        </receiver>
+        <receiver
+            android:name=".PaceWidget"
+            android:exported="false"
+            android:label="@string/widget_pace_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pace_info"/>
+        </receiver>
+        <receiver
+            android:name=".CategoriesWidget"
+            android:exported="false"
+            android:label="@string/widget_categories_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_categories_info"/>
+        </receiver>
+        <receiver
+            android:name=".QuickAddWidget"
+            android:exported="false"
+            android:label="@string/widget_add_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_add_info"/>
+        </receiver>
+        <receiver
+            android:name=".WidgetActionReceiver"
+            android:exported="false"/>
+
+        <!-- Category buttons on payment alerts. -->
+        <receiver
+            android:name=".AlertActionReceiver"
+            android:exported="false"/>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

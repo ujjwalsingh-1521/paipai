@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where it went: this month's share bar (an image) and the top
+     categories with amount and share; rows beyond the space are hidden. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cat_month"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="October"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/cat_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹12,450"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/cat_bar"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="4dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY" />
+
+    <LinearLayout
+        android:id="@+id/cat_row_1"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cat_dot_1"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_1"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cat_row_2"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cat_dot_2"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_2"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cat_row_3"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cat_dot_3"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_3"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cat_row_4"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/cat_dot_4"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_4"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cat_row_5"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/cat_dot_5"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_5"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_5"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_5"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cat_row_6"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/cat_dot_6"
+            android:layout_width="14dp"
+            android:layout_height="wrap_content"
+            android:text="●"
+            android:textColor="@color/widget_primary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/cat_name_6"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Groceries"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_amount_6"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="₹5,200"
+            android:textColor="@color/widget_on_surface"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/cat_percent_6"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:text="42%"
+            android:textColor="@color/widget_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/cat_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="No spending this month yet"
+        android:textColor="@color/widget_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>
