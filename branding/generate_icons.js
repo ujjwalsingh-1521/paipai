@@ -1,5 +1,5 @@
 // Run: npm i @resvg/resvg-js@2 && node branding/generate_icons.js
-// Generates PaiPai launcher icons from one vector design (108x108 adaptive-icon grid).
+// Generates PaiPai launcher and notification icons from one vector design (108x108 adaptive-icon grid).
 const fs = require('fs');
 const path = require('path');
 const { Resvg } = require('@resvg/resvg-js');
@@ -8,56 +8,43 @@ const PROJECT = path.resolve(__dirname, '..');
 const RES = `${PROJECT}/android/app/src/main/res`;
 const BRAND = `${PROJECT}/branding`;
 
-const C = {
-  bgFrom: '#3B82F6', bgTo: '#1D4ED8',
-  coin: '#FBBF24', coinEdge: '#F59E0B', coinShine: '#FDE68A',
-  backCoin: '#F59E0B', backEdge: '#D97706',
-  glyph: '#1E3A8A', halo: '#0B1F5C',
-};
+const C = { background: '#2563EB', front: '#FFFFFF', back: '#BFDBFE', dot: '#FBBF24' };
 
-// ₹ glyph as stroke commands, centred on the front coin (49,59).
-const GLYPH = [
-  ['M', 39, 46], ['H', 59],
-  ['M', 39, 53], ['H', 59],
-  ['M', 45, 46], ['C', 52, 46, 55, 49, 55, 53], ['C', 55, 57.5, 51, 60, 45, 60], ['H', 41], ['L', 56, 72],
-];
-const glyphPath = (map = (x, y) => [x, y]) => GLYPH.map(([cmd, ...n]) => {
-  if (cmd === 'H') return `H${map(n[0], 0)[0].toFixed(2)}`;
-  const pts = [];
-  for (let i = 0; i < n.length; i += 2) pts.push(map(n[i], n[i + 1]).map(v => v.toFixed(2)).join(' '));
-  return `${cmd}${pts.join(' ')}`;
-}).join(' ');
+// Lowercase "p" from Fredoka SemiBold (SIL OFL), font units (1000/em, y up, baseline 0). Outlined so
+// the icons don't depend on the font being installed. See README.md for how it was extracted.
+const LETTER_P = 'M302.5 0Q253.5 0 216.2 19.2Q179 38.5 154.2 72.4Q129.5 106.2 117.1 150.2Q104.8 194.2 105.5 244.5Q106.2 294 119 338.6Q131.8 383.2 156.5 417.4Q181.2 451.5 217.8 471.1Q254.2 490.8 302.5 490.8Q347.2 490.8 388.4 470.8Q429.5 450.8 461.8 416.1Q494 381.5 512.5 336.6Q531 291.8 531 242.2Q531 191.5 512.5 147.2Q494 103 462.1 70Q430.2 37 389.1 18.5Q348 0 302.5 0ZM110 -216.2Q74.2 -216.2 58.4 -205.8Q42.5 -195.2 39.1 -178.6Q35.8 -162 35.8 -142.8V416.2Q35.8 435.8 39 452.4Q42.2 469 57.8 479.9Q73.2 490.8 109 490.8Q139.5 490.8 158.4 482Q177.2 473.2 184.8 454V-141.8Q186.2 -161 182.2 -178.1Q178.2 -195.2 162.4 -205.8Q146.5 -216.2 110 -216.2ZM282.2 140.8Q309.8 140.8 332 154.1Q354.2 167.5 367.5 190.5Q380.8 213.5 380.8 241.5Q380.8 270.5 367.9 293.2Q355 316 332.8 328.9Q310.5 341.8 283 341.8Q255.8 341.8 233.5 328.4Q211.2 315 198.4 292.6Q185.5 270.2 185.5 241.5Q185.5 213.5 198.8 190.5Q212 167.5 233.9 154.1Q255.8 140.8 282.2 140.8Z';
 
-const background = `
-  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="${C.bgFrom}"/><stop offset="1" stop-color="${C.bgTo}"/>
-  </linearGradient></defs>`;
+// Twin "p" (the doubled "Pai Pai") + gold dot, centred on the grid. 48-unit letters (0.048 per font unit).
+const SCALE = 0.048;
+const BASELINE = 61;
+const FRONT_X = 26.75;   // left edge of the front p's advance box
+const BACK_X = 45.75;
+const DOT = { cx: 76, cy: 59, r: 3.8 };
+const GAP = 5;           // clear space cut around the front p where it overlaps the back one
 
-const coins = `
-  <circle cx="63" cy="45" r="19" fill="${C.backCoin}"/>
-  <circle cx="63" cy="45" r="17.8" fill="none" stroke="${C.backEdge}" stroke-width="2.2"/>
-  <circle cx="63" cy="45" r="14.5" fill="none" stroke="${C.coin}" stroke-width="1" opacity=".7"/>
-  <circle cx="49" cy="60" r="25.5" fill="${C.halo}" opacity=".45"/>
-  <circle cx="49" cy="60" r="23" fill="${C.coin}"/>
-  <circle cx="49" cy="60" r="21.8" fill="none" stroke="${C.coinEdge}" stroke-width="2.4"/>
-  <circle cx="49" cy="60" r="18.2" fill="none" stroke="${C.coinShine}" stroke-width="1"/>
-  <path d="${glyphPath()}" fill="none" stroke="${C.glyph}" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+const letter = (x, attrs) =>
+  `<path transform="translate(${x} ${BASELINE}) scale(${SCALE} ${-SCALE})" d="${LETTER_P}" ${attrs}/>`;
 
-// Themed-icon layer (Android 13+): single colour, back coin masked behind the front one.
-const monochrome = `
-  <defs><mask id="m"><rect width="108" height="108" fill="#fff"/><circle cx="49" cy="60" r="26" fill="#000"/></mask></defs>
-  <circle cx="63" cy="45" r="17.5" fill="none" stroke="#fff" stroke-width="3" mask="url(#m)"/>
-  <circle cx="49" cy="60" r="21.5" fill="none" stroke="#fff" stroke-width="3"/>
-  <path d="${glyphPath()}" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+// The back p is masked by the front p plus a GAP-wide outline, so the two read as separate letters.
+const mark = (backFill, frontFill, dotFill) => `
+  <defs><mask id="gap"><rect width="108" height="108" fill="#fff"/>
+    ${letter(FRONT_X, `fill="#000" stroke="#000" stroke-width="${GAP / SCALE}" stroke-linejoin="round"`)}</mask></defs>
+  <g mask="url(#gap)">${letter(BACK_X, `fill="${backFill}"`)}</g>
+  ${letter(FRONT_X, `fill="${frontFill}"`)}
+  <circle cx="${DOT.cx}" cy="${DOT.cy}" r="${DOT.r}" fill="${dotFill}"/>`;
 
 const svg = (body, viewBox = '0 0 108 108') =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">${body}</svg>`;
 
-const FULL_SQUARE = svg(`${background}<rect width="108" height="108" fill="url(#bg)"/>${coins}`);
-const FOREGROUND = svg(coins);
-const MONOCHROME = svg(monochrome);
+const COLOUR_MARK = mark(C.back, C.front, C.dot);
+const FULL_SQUARE = svg(`<rect width="108" height="108" fill="${C.background}"/>${COLOUR_MARK}`);
+const FOREGROUND = svg(COLOUR_MARK);
+// Themed-icon layer (Android 13+): single colour, the system tints it.
+const MONOCHROME = svg(mark('#fff', '#fff', '#fff'));
 // Pre-Android-8 icon: inner 72x72 of the grid on a rounded square.
-const LEGACY = svg(`${background}<rect x="18" y="18" width="72" height="72" rx="16" fill="url(#bg)"/>${coins}`, '18 18 72 72');
+const LEGACY = svg(`<rect x="18" y="18" width="72" height="72" rx="16" fill="${C.background}"/>${COLOUR_MARK}`, '18 18 72 72');
+// Status-bar icon: white mark cropped close (the system draws it at 24dp and tints it).
+const STATUS_BAR = svg(mark('#fff', '#fff', '#fff'), '25 25.4 58 58');
 
 const render = (svgText, size, outFile) => {
   const png = new Resvg(svgText, { fitTo: { mode: 'width', value: size } }).render().asPng();
@@ -70,7 +57,10 @@ for (const [name, scale] of Object.entries(DENSITIES)) {
   render(LEGACY, 48 * scale, `${RES}/mipmap-${name}/ic_launcher.png`);
   render(FOREGROUND, 108 * scale, `${RES}/mipmap-${name}/ic_launcher_foreground.png`);
   render(MONOCHROME, 108 * scale, `${RES}/mipmap-${name}/ic_launcher_monochrome.png`);
+  render(STATUS_BAR, 24 * scale, `${RES}/drawable-${name}/ic_stat_paipai.png`);
 }
+// The status-bar icon used to be a vector; the PNGs above replace it (two resources can't share a name).
+fs.rmSync(`${RES}/drawable/ic_stat_paipai.xml`, { force: true });
 
 fs.mkdirSync(`${RES}/mipmap-anydpi-v26`, { recursive: true });
 fs.writeFileSync(`${RES}/mipmap-anydpi-v26/ic_launcher.xml`, `<?xml version="1.0" encoding="utf-8"?>
@@ -82,21 +72,8 @@ fs.writeFileSync(`${RES}/mipmap-anydpi-v26/ic_launcher.xml`, `<?xml version="1.0
 `);
 fs.writeFileSync(`${RES}/drawable/ic_launcher_background.xml`, `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="315" android:startColor="${C.bgFrom}" android:endColor="${C.bgTo}"/>
+    <solid android:color="${C.background}"/>
 </shape>
-`);
-
-// Status-bar icon: white ₹ only, scaled from the 108 grid into 24dp.
-const toStatusBar = (x, y) => [12 + (x - 49) * 0.68, 12 + (y - 59) * 0.68];
-fs.writeFileSync(`${RES}/drawable/ic_stat_paipai.xml`, `<?xml version="1.0" encoding="utf-8"?>
-<!-- PaiPai status-bar icon (white ₹). Generated by branding/generate_icons.js -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:pathData="${glyphPath(toStatusBar)}"
-        android:strokeColor="#FFFFFFFF" android:strokeWidth="3"
-        android:strokeLineCap="round" android:strokeLineJoin="round"/>
-</vector>
 `);
 
 fs.mkdirSync(BRAND, { recursive: true });
@@ -104,5 +81,6 @@ fs.writeFileSync(`${BRAND}/paipai_icon.svg`, FULL_SQUARE);
 fs.writeFileSync(`${BRAND}/paipai_foreground.svg`, FOREGROUND);
 fs.writeFileSync(`${BRAND}/paipai_monochrome.svg`, MONOCHROME);
 render(FULL_SQUARE, 512, `${BRAND}/paipai_icon_512.png`);
+render(STATUS_BAR, 96, `${BRAND}/paipai_status_96.png`);
 
 console.log('done');
