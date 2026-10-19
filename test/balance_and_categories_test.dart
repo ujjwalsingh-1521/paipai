@@ -37,6 +37,17 @@ void main() {
       expect(start.currentBalance([backdated], []), 9700);
     });
 
+    test('payments captured before it was set never move it, even labelled later', () {
+      // Imported from old SMS: ₹300 expense (split into 2 parts) and ₹1,000 income.
+      final split = [
+        Expense(id: 8, amount: 200, category: 'Food', date: DateTime(2026, 9, 20), splitId: 8),
+        Expense(id: 9, amount: 100, category: 'Shopping', date: DateTime(2026, 9, 20), splitId: 8),
+      ];
+      const earlier = EarlierPayments(expenseIds: {8}, incomeIds: {4});
+      final balance = start.currentBalance([...split, _expense(10, 50)], [_income(4, 1000)], earlier: earlier);
+      expect(balance, 9950);
+    });
+
     test('can go below zero', () {
       expect(start.currentBalance([_expense(6, 12000)], []), -2000);
     });

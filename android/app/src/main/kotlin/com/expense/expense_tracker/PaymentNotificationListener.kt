@@ -21,15 +21,21 @@ class PaymentNotificationListener : NotificationListenerService() {
         val flags = notification.flags
         if (flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         if (flags and Notification.FLAG_ONGOING_EVENT != 0) return
+        // With SMS read directly, app notifications are an extra the user opts into.
+        val smsActive = SmsCapture.granted(applicationContext)
+        if (smsActive && !SmsCapture.appAlertsEnabled(applicationContext)) return
 
         for (message in NotificationText.extract(sbn)) {
             if (CaptureHealth.isHiddenByAndroid(message)) {
+                // Hidden SMS texts don't matter once PaiPai reads SMS itself.
+                if (smsActive) continue
                 Log.i(TAG, "Android hid a notification from ${sbn.packageName}")
                 CaptureHealth.recordHidden(applicationContext)
             } else if (NotificationText.mentionsMoney(message)) {
                 // Logs the app only, never the message text.
                 Log.i(TAG, "money notification from ${sbn.packageName}")
-                CaptureEngine.deliver(applicationContext, "onNotification", message)
+                // Dart drops SMS apps' notifications then: the SMS itself arrives too.
+                CaptureEngine.deliver(applicationContext, "onNotification", message + ("smsCaptureActive" to smsActive))
             }
         }
     }

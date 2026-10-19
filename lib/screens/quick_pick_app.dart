@@ -44,13 +44,23 @@ class _QuickPickHostState extends ConsumerState<_QuickPickHost> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _pickThenClose());
   }
 
+  /// Always closes in the end: a see-through window left open would swallow
+  /// every touch on the app underneath.
   Future<void> _pickThenClose() async {
+    try {
+      await _pick();
+    } finally {
+      await SystemNavigator.pop();
+    }
+  }
+
+  Future<void> _pick() async {
     // The Quick add widget opens this card with the + sheet instead.
     if (await CaptureChannel.pickerMode() == 'add') {
       if (mounted) await showAddEntrySheet(context);
       await WidgetSync.push();
       await BudgetCheck.run();
-      return SystemNavigator.pop();
+      return;
     }
     final id = await CaptureChannel.pickerPendingId();
     final tx = id == null ? null : await DatabaseHelper().getPendingTransaction(id);
@@ -58,7 +68,6 @@ class _QuickPickHostState extends ConsumerState<_QuickPickHost> {
     if (tx != null && !tx.isProcessed && mounted) {
       await showPaymentReviewSheet(context, tx);
     }
-    await SystemNavigator.pop();
   }
 
   // See-through, so the app underneath stays visible around the card.

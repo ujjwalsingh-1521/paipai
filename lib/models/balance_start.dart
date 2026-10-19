@@ -4,6 +4,17 @@ import '../utils/money.dart';
 import 'expense.dart';
 import 'income.dart';
 
+/// Entries saved from captured payments that happened before the balance
+/// was set. Expense ids are a split's first part (Expense.recordedId).
+class EarlierPayments {
+  final Set<int> expenseIds;
+  final Set<int> incomeIds;
+
+  const EarlierPayments({this.expenseIds = const {}, this.incomeIds = const {}});
+
+  static const none = EarlierPayments();
+}
+
 /// The bank balance the user typed in, and where the entries stood at that
 /// moment. Everything added afterwards moves the balance; everything that
 /// existed before is already part of the typed amount.
@@ -24,10 +35,18 @@ class BalanceStart {
   /// them, so anything recorded after the balance was set moves it, even
   /// if it's dated earlier that day. Splitting an older payment adds rows
   /// with new ids, so parts count by their split's first part.
-  double currentBalance(List<Expense> expenses, List<Income> income) {
-    final added = sumMoney(income.where((i) => (i.id ?? 0) > lastIncomeId).map((i) => i.amount));
-    final spent =
-        sumMoney(expenses.where((e) => e.recordedId > lastExpenseId).map((e) => e.amount));
+  ///
+  /// [earlier] are captured payments that happened before the balance was
+  /// set (say, imported from old SMS): the typed amount already includes
+  /// them, however late they're labelled.
+  double currentBalance(List<Expense> expenses, List<Income> income,
+      {EarlierPayments earlier = EarlierPayments.none}) {
+    final added = sumMoney(income
+        .where((i) => (i.id ?? 0) > lastIncomeId && !earlier.incomeIds.contains(i.id))
+        .map((i) => i.amount));
+    final spent = sumMoney(expenses
+        .where((e) => e.recordedId > lastExpenseId && !earlier.expenseIds.contains(e.recordedId))
+        .map((e) => e.amount));
     return roundMoney(amount + added - spent);
   }
 

@@ -7,6 +7,7 @@ import '../models/expense.dart';
 import '../models/ledger_entry.dart';
 import '../models/pending_transaction.dart';
 import '../providers/balance_provider.dart';
+import 'pending_transactions_screen.dart';
 import '../providers/budget_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/income_provider.dart';
@@ -52,7 +53,8 @@ class HomeScreen extends ConsumerWidget {
           start: ref.watch(balanceStartProvider).valueOrNull,
           entries: entries,
           // Raw lists: a split payment's row holds only its first part.
-          balance: (start) => start.currentBalance(expenses, income),
+          balance: (start) =>
+              ref.watch(balanceProvider).valueOrNull ?? start.currentBalance(expenses, income),
           now: now,
         ),
         if (pending.isNotEmpty) ...[
@@ -209,7 +211,9 @@ class _ReviewBanner extends ConsumerWidget {
     final first = pending.first;
     final detail = count == 1
         ? '${formatMoney(first.amount)}${first.merchant == null ? '' : ' · ${first.merchant}'}'
-        : 'Tap to go through them one by one';
+        : count > _listFrom
+            ? 'Tap to see them all'
+            : 'Tap to go through them one by one';
     return Material(
       color: colors.tertiaryContainer,
       borderRadius: BorderRadius.circular(Corners.large),
@@ -221,10 +225,16 @@ class _ReviewBanner extends ConsumerWidget {
             style: context.text.titleSmall?.copyWith(color: colors.onTertiaryContainer)),
         subtitle: Text(detail, style: context.text.bodySmall?.copyWith(color: colors.onTertiaryContainer)),
         trailing: Icon(Icons.chevron_right_rounded, color: colors.onTertiaryContainer),
-        onTap: () => reviewPendingPayments(context, ref),
+        onTap: () => count > _listFrom
+            ? Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const PendingTransactionsScreen()))
+            : reviewPendingPayments(context, ref),
       ),
     );
   }
+
+  /// More than this (say, after an SMS import) opens the list first.
+  static const _listFrom = 5;
 }
 
 /// This month so far against last month; opens Insights.

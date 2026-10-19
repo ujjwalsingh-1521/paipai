@@ -5,6 +5,7 @@ import '../../models/pending_transaction.dart';
 import 'capture_alerts.dart';
 import 'capture_service.dart';
 import 'parsed_payment.dart';
+import 'sms_inbox.dart';
 import '../budgets/budget_check.dart';
 import '../widgets/widget_sync.dart';
 
@@ -13,6 +14,7 @@ import '../widgets/widget_sync.dart';
 /// in both Flutter engines: the background capture engine and the app.
 class CaptureChannel {
   static const _channel = MethodChannel('com.expense.expense_tracker/capture');
+  static const _replyWithin = Duration(seconds: 2);
 
   // --- Background engine ---
 
@@ -23,12 +25,22 @@ class CaptureChannel {
       try {
         switch (call.method) {
           case 'onNotification':
-            await service.handleNotification(NotificationInput.fromMap(args));
+            // The SMS receiver holds PaiPai's broadcasts until this replies;
+            // behind an import or scan, reply early and let it finish.
+            await service
+                .handleNotification(NotificationInput.fromMap(args))
+                .timeout(_replyWithin, onTimeout: () {});
           case 'onAlertAction':
             await service.categorize(args['pendingId'] as int, args['category'] as String);
           case 'refreshWidgets':
             await WidgetSync.push();
+          case 'scanSms':
+            await SmsInbox.catchUp(service);
+          case 'importSms':
+            return await SmsInbox.import(
+                service, DateTime.fromMillisecondsSinceEpoch(args['from'] as int));
         }
+        return null;
       } catch (error, stack) {
         // Nobody awaits these calls natively, so make failures visible in logcat.
         debugPrint('PaiPaiCapture: ${call.method} failed: $error\n$stack');
@@ -115,6 +127,44 @@ class CaptureChannel {
 
   /// For Android's "Allow restricted settings" step.
   static Future<void> openAppInfo() => _channel.invokeMethod('openAppInfo');
+
+  // --- Bank SMS (SmsCapture.kt) ---
+
+  static Future<SmsStatus> smsStatus() async =>
+      SmsStatus.fromMap(await _channel.invokeMapMethod<String, Object?>('smsStatus') ?? const {});
+
+  /// Shows Android's SMS prompt. 'blocked' means Android didn't ask (a
+  /// restricted setting, or "Don't allow" chosen before): fix in App info.
+  static Future<String> requestSmsPermission() async =>
+      await _channel.invokeMethod<String>('requestSmsPermission') ?? 'denied';
+
+  /// Also read bank and UPI app notifications (needs Notification access).
+  static Future<void> setAppAlerts(bool enabled) =>
+      _channel.invokeMethod('setAppAlerts', {'enabled': enabled});
+
+  /// Looks for bank SMS that arrived while PaiPai couldn't run.
+  static Future<void> requestSmsScan() => _channel.invokeMethod('requestSmsScan');
+
+  /// Brings in payment SMS received since [from]; returns how many new payments it found.
+  static Future<int> importSms(DateTime from) async =>
+      await _channel
+          .invokeMethod<int>('importSms', {'from': from.millisecondsSinceEpoch})
+          // The capture engine didn't answer (it failed to start).
+          .timeout(const Duration(minutes: 10)) ??
+      0;
+}
+
+/// Whether PaiPai can read bank SMS, and whether app notifications are on too.
+class SmsStatus {
+  final bool granted;
+  final bool appAlerts;
+
+  const SmsStatus({required this.granted, required this.appAlerts});
+
+  factory SmsStatus.fromMap(Map<String, Object?> map) => SmsStatus(
+        granted: map['granted'] as bool? ?? false,
+        appAlerts: map['appAlerts'] as bool? ?? false,
+      );
 }
 
 /// Whether Android 15+ is hiding bank messages from PaiPai (see CaptureHealth.kt).

@@ -93,8 +93,46 @@ object AppChannel {
             "openAppInfo" -> done(result) { openAppInfo(activity) }
             "canPinWidgets" -> result.success(canPinWidgets(activity))
             "pinWidget" -> result.success(pinWidget(activity, call.argument<String>("kind")))
-            else -> if (!AlertNotifier.handle(activity, call, result)) result.notImplemented()
+            "requestSmsPermission" -> requestSms(activity, result)
+            "requestSmsScan" -> done(result) {
+                if (SmsCapture.granted(activity)) CaptureEngine.deliver(activity, "scanSms", null)
+            }
+            // Runs in the capture engine, in line with live SMS, so none is recorded twice.
+            "importSms" -> CaptureEngine.deliver(activity, "importSms", call.arguments) { ok, reply ->
+                if (ok) result.success(reply) else result.error("import_failed", null, null)
+            }
+            else -> if (!AlertNotifier.handle(activity, call, result) &&
+                !SmsCapture.handle(activity, call, result)) result.notImplemented()
         }
+    }
+
+    private const val SMS_REQUEST = 1002
+    private var smsResult: MethodChannel.Result? = null
+
+    /** Replies "granted", "denied", or "blocked" (Android didn't ask: see below). */
+    private fun requestSms(activity: Activity, result: MethodChannel.Result) {
+        if (SmsCapture.granted(activity)) return result.success("granted")
+        smsResult?.success("denied")
+        smsResult = result
+        activity.requestPermissions(arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS), SMS_REQUEST)
+    }
+
+    /** From MainActivity.onRequestPermissionsResult. */
+    fun onPermissionResult(activity: Activity, requestCode: Int, grantResults: IntArray) {
+        if (requestCode != SMS_REQUEST) return
+        val result = smsResult ?: return
+        smsResult = null
+        // The prompt was dismissed without an answer.
+        if (grantResults.isEmpty()) return result.success("denied")
+        // No prompt and no "ask again": a sideloaded app's SMS access is a
+        // restricted setting until allowed in App info, or the user chose
+        // "Don't allow" twice. Either way the fix is in App info.
+        val reply = when {
+            SmsCapture.granted(activity) -> "granted"
+            activity.shouldShowRequestPermissionRationale(Manifest.permission.READ_SMS) -> "denied"
+            else -> "blocked"
+        }
+        result.success(reply)
     }
 
     // Actions with no result: reply null (Kotlin Unit cannot cross the channel).

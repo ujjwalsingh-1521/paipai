@@ -556,6 +556,57 @@ class DatabaseHelper {
     );
   }
 
+  /// Entries saved from captured payments that happened before [moment].
+  Future<({Set<int> expenseIds, Set<int> incomeIds})> entriesCapturedBefore(DateTime moment) async {
+    final db = await database;
+    final rows = await db.query('pending_transactions',
+        columns: ['created_expense_id', 'created_income_id'],
+        where: 'is_processed = 1 AND detected_at < ?',
+        whereArgs: [moment.toIso8601String()]);
+    return (
+      expenseIds: {for (final row in rows) if (row['created_expense_id'] != null) row['created_expense_id'] as int},
+      incomeIds: {for (final row in rows) if (row['created_income_id'] != null) row['created_income_id'] as int},
+    );
+  }
+
+  /// Saves a captured payment's entry and marks the payment handled in one
+  /// transaction. False if it was already handled: two taps (or the More card
+  /// and the capture engine) can race, and only the first may save.
+  Future<bool> saveCapturedEntry(int pendingId, {Expense? expense, Income? income}) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      if (!await _claimPending(txn, pendingId)) return false;
+      final expenseId = expense == null ? null : await txn.insert('expenses', expense.toMap());
+      final incomeId = income == null ? null : await txn.insert('income', income.toMap());
+      await _linkPending(txn, pendingId, expenseId: expenseId, incomeId: incomeId);
+      return true;
+    });
+  }
+
+  /// [saveSplit] for a captured payment, claimed like [saveCapturedEntry].
+  Future<bool> saveCapturedSplit(int pendingId, Expense payment, List<SplitPart> parts) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      if (!await _claimPending(txn, pendingId)) return false;
+      final leadId = await txn.insert('expenses', _partRow(payment, parts.first, null));
+      await txn.update('expenses', {'split_id': leadId}, where: 'id = ?', whereArgs: [leadId]);
+      for (final part in parts.skip(1)) {
+        await txn.insert('expenses', _partRow(payment, part, leadId));
+      }
+      await _linkPending(txn, pendingId, expenseId: leadId);
+      return true;
+    });
+  }
+
+  static Future<bool> _claimPending(Transaction txn, int pendingId) async =>
+      await txn.update('pending_transactions', {'is_processed': 1},
+          where: 'id = ? AND is_processed = 0', whereArgs: [pendingId]) ==
+      1;
+
+  static Future<void> _linkPending(Transaction txn, int pendingId, {int? expenseId, int? incomeId}) =>
+      txn.update('pending_transactions', {'created_expense_id': expenseId, 'created_income_id': incomeId},
+          where: 'id = ?', whereArgs: [pendingId]);
+
   Future<int> deletePendingTransaction(int id) async {
     final db = await database;
     return db.delete('pending_transactions',
@@ -617,13 +668,14 @@ class DatabaseHelper {
     return maps.isEmpty ? null : PendingTransaction.fromMap(maps.first);
   }
 
-  /// Captures (handled or not) detected since [since]; used to merge
-  /// alerts for the same payment that arrive through different apps.
-  Future<List<PendingTransaction>> getCapturesSince(DateTime since) async {
+  /// Captures (handled or not) detected between [from] and [until]; used to
+  /// merge alerts for the same payment that arrive through different apps.
+  /// Bounded on both sides so importing old SMS stays fast.
+  Future<List<PendingTransaction>> getCapturesBetween(DateTime from, DateTime until) async {
     final db = await database;
     final maps = await db.query('pending_transactions',
-        where: 'detected_at >= ?',
-        whereArgs: [since.toIso8601String()],
+        where: 'detected_at >= ? AND detected_at <= ?',
+        whereArgs: [from.toIso8601String(), until.toIso8601String()],
         orderBy: 'detected_at DESC');
     return maps.map(PendingTransaction.fromMap).toList();
   }

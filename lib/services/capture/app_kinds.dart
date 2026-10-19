@@ -5,6 +5,10 @@ enum AppKind { sms, email, payment, chat, other }
 class AppKinds {
   static const ownPackage = 'com.expense.expense_tracker';
 
+  /// The source of SMS that PaiPai reads itself (SmsCapture.kt), not
+  /// through a messaging app's notification.
+  static const smsSource = 'sms';
+
   static const _sms = {
     'com.google.android.apps.messaging',
     'com.samsung.android.messaging',
@@ -66,7 +70,7 @@ class AppKinds {
   };
 
   static AppKind of(String package) {
-    if (_sms.contains(package)) return AppKind.sms;
+    if (package == smsSource || isSmsApp(package)) return AppKind.sms;
     if (_email.contains(package)) return AppKind.email;
     if (_chat.contains(package)) return AppKind.chat;
     if (_payment.contains(package) || package.toLowerCase().contains('bank')) {
@@ -84,6 +88,7 @@ class AppKinds {
       };
 
   static const _labels = {
+    smsSource: 'SMS',
     'com.google.android.apps.messaging': 'Messages (SMS)',
     'com.samsung.android.messaging': 'Samsung Messages (SMS)',
     'com.truecaller': 'Truecaller (SMS)',
@@ -109,6 +114,9 @@ class AppKinds {
     'com.google.android.apps.walletnfcrel': 'Google Wallet',
     'com.android.shell': 'Test (adb)',
   };
+
+  /// A messaging app's notification for an SMS (which PaiPai may also read itself).
+  static bool isSmsApp(String package) => _sms.contains(package);
 
   /// Our own alerts must never be parsed back in.
   static bool isIgnored(String package) => package == ownPackage;

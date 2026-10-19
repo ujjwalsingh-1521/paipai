@@ -16,12 +16,16 @@ class NotificationInput {
   /// Stable per message: the same id + text means Android re-posted it.
   final String messageId;
 
+  /// PaiPai reads SMS itself, so an SMS app's notification is a repeat.
+  final bool smsCaptureActive;
+
   const NotificationInput({
     required this.app,
     required this.title,
     required this.text,
     required this.postedAt,
     this.messageId = '',
+    this.smsCaptureActive = false,
   });
 
   factory NotificationInput.fromMap(Map<Object?, Object?> map) =>
@@ -32,6 +36,7 @@ class NotificationInput {
         postedAt: DateTime.fromMillisecondsSinceEpoch(
             map['postedAt'] as int? ?? DateTime.now().millisecondsSinceEpoch),
         messageId: map['messageId'] as String? ?? '',
+        smsCaptureActive: map['smsCaptureActive'] as bool? ?? false,
       );
 }
 

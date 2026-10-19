@@ -2,11 +2,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/database_helper.dart';
 import '../models/balance_start.dart';
+import 'expense_provider.dart';
+import 'income_provider.dart';
 
 /// The bank balance the user set (null until they do). Home adds and
 /// subtracts everything recorded since.
 final balanceStartProvider =
     AsyncNotifierProvider<BalanceStartNotifier, BalanceStart?>(BalanceStartNotifier.new);
+
+/// Home's bank balance (null until the user sets it).
+final balanceProvider = FutureProvider<double?>((ref) async {
+  final start = await ref.watch(balanceStartProvider.future);
+  if (start == null) return null;
+  final expenses = await ref.watch(expenseProvider.future);
+  final income = await ref.watch(incomeProvider.future);
+  final earlier = await DatabaseHelper().entriesCapturedBefore(start.setAt);
+  return start.currentBalance(expenses, income,
+      earlier: EarlierPayments(expenseIds: earlier.expenseIds, incomeIds: earlier.incomeIds));
+});
 
 class BalanceStartNotifier extends AsyncNotifier<BalanceStart?> {
   static const _key = 'balance_start';

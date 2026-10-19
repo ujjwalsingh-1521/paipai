@@ -3,6 +3,11 @@
     <!-- Payment alerts. Reading notifications needs no permission here:
          the user grants "Notification access" in Android settings. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Bank SMS, the main source of payments (SmsCapture.kt): new ones as
+         they arrive, and the inbox for ones missed while the phone was off. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
         android:label="PaiPai"
@@ -48,6 +53,23 @@
                 <action android:name="android.service.notification.NotificationListenerService"/>
             </intent-filter>
         </service>
+
+        <!-- New SMS; only the system's SMS service can send this. -->
+        <receiver
+            android:name=".SmsCaptureReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
 
         <!-- Home-screen widgets (PaiPaiWidgets.kt). -->
         <receiver

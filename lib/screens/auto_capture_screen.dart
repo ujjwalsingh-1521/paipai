@@ -24,6 +24,10 @@ class _AutoCaptureScreenState extends ConsumerState<AutoCaptureScreen>
   bool? _hasAccess;
   bool? _canNotify;
   CaptureHealth? _health;
+  SmsStatus? _sms;
+  // Android didn't show the SMS prompt: explain the App info fix.
+  bool _smsBlocked = false;
+  bool _importing = false;
 
   @override
   void initState() {
@@ -48,12 +52,59 @@ class _AutoCaptureScreenState extends ConsumerState<AutoCaptureScreen>
     final access = await CaptureChannel.hasNotificationAccess();
     final notify = await CaptureChannel.canPostNotifications();
     final health = await CaptureChannel.health();
+    final sms = await CaptureChannel.smsStatus();
     if (!mounted) return;
     setState(() {
       _hasAccess = access;
       _canNotify = notify;
       _health = health;
+      _sms = sms;
+      if (sms.granted) _smsBlocked = false;
     });
+  }
+
+  Future<void> _allowSms() async {
+    final answer = await CaptureChannel.requestSmsPermission();
+    if (!mounted) return;
+    setState(() => _smsBlocked = answer == 'blocked');
+    await _loadStatus();
+  }
+
+  Future<void> _setAppAlerts(bool enabled) async {
+    await CaptureChannel.setAppAlerts(enabled);
+    await _loadStatus();
+  }
+
+  /// "Bring in older payments": the user picks how far back.
+  Future<void> _importPast() async {
+    final now = DateTime.now();
+    final from = await showDatePicker(
+      context: context,
+      helpText: 'Bring in payments since',
+      initialDate: DateTime(now.year, now.month),
+      firstDate: DateTime(now.year - 1, now.month, now.day),
+      lastDate: now,
+    );
+    if (from == null || !mounted) return;
+    setState(() => _importing = true);
+    try {
+      final found = await CaptureChannel.importSms(from);
+      await ref.read(pendingTransactionProvider.notifier).refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(switch (found) {
+          0 => 'No new payments found since then.',
+          1 => 'Found 1 new payment. It waits on Home to be labelled.',
+          _ => 'Found $found new payments. They wait on Home to be labelled.',
+        }),
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Couldn't read older SMS: $error")));
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
   }
 
   Future<void> _sendTestPayment() async {
@@ -76,19 +127,25 @@ class _AutoCaptureScreenState extends ConsumerState<AutoCaptureScreen>
 
   @override
   Widget build(BuildContext context) {
-    final ready = _hasAccess == true && _canNotify == true;
+    final smsOn = _sms?.granted == true;
+    // Without SMS, notification access is how payments are found.
+    final ready = (smsOn || _hasAccess == true) && _canNotify == true;
     return Scaffold(
       appBar: AppBar(title: const Text('Auto-capture payments')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(Space.l, Space.s, Space.l, Space.xxl),
         children: [
-          _StatusBanner(ready: ready, loading: _hasAccess == null),
+          _StatusBanner(ready: ready, loading: _hasAccess == null || _sms == null),
           const SizedBox(height: Space.l),
-          _accessStep(),
+          _smsStep(smsOn),
           const SizedBox(height: Space.m),
           _notifyStep(),
           const SizedBox(height: Space.m),
-          if (_health?.affected == true) ...[
+          if (smsOn) ...[_importCard(), const SizedBox(height: Space.m)],
+          _appAlertsCard(smsOn),
+          const SizedBox(height: Space.m),
+          // Hidden SMS texts only matter while SMS come through notifications.
+          if (!smsOn && _hasAccess == true && _health?.affected == true) ...[
             _HiddenMessagesStep(health: _health!),
             const SizedBox(height: Space.m),
           ],
@@ -100,17 +157,82 @@ class _AutoCaptureScreenState extends ConsumerState<AutoCaptureScreen>
     );
   }
 
-  Widget _accessStep() => _StepCard(
+  Widget _smsStep(bool smsOn) => _StepCard(
         number: 1,
-        title: 'Read payment notifications',
-        description: 'Lets PaiPai see bank SMS, UPI app and bank email alerts. '
-            'It only looks at notifications that mention money, and nothing '
-            'leaves your phone.',
-        done: _hasAccess == true,
+        title: 'Read bank SMS',
+        description: 'Every payment, from any bank or UPI app, brings a bank SMS. '
+            'PaiPai reads only messages from businesses that mention money (never '
+            'personal chats or ads), also ones that came while your phone was off. '
+            'Nothing leaves your phone.',
+        done: smsOn,
+        actionLabel: 'Allow',
+        onAction: _allowSms,
+        help: smsOn || !_smsBlocked ? null : const _RestrictedSettingsHelp(sms: true),
+      );
+
+  Widget _importCard() => GroupCard(
+        padding: const EdgeInsets.all(Space.l),
+        children: [
+          Row(children: [
+            Icon(Icons.history_rounded, color: context.colors.primary),
+            const SizedBox(width: Space.m),
+            Expanded(
+              child: Text(
+                  'Bring in payments from older SMS, from a date you choose. Ones from '
+                  "before you set your bank balance won't change it.",
+                  style: context.text.bodyMedium),
+            ),
+            const SizedBox(width: Space.s),
+            _importing
+                ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 3))
+                : FilledButton.tonal(onPressed: _importPast, child: const Text('Choose')),
+          ]),
+        ],
+      );
+
+  /// Optional with SMS on; the only way to capture without it.
+  Widget _appAlertsCard(bool smsOn) {
+    final access = _hasAccess == true;
+    if (!smsOn) {
+      return _StepCard(
+        number: 3,
+        title: 'Or read payment notifications',
+        description: 'Without SMS, PaiPai can read notifications instead: bank SMS '
+            '(through your messages app), UPI apps and bank emails. Payments can be '
+            'missed this way (phone off, notification cleared).',
+        done: access,
         actionLabel: 'Allow',
         onAction: CaptureChannel.openNotificationAccessSettings,
-        help: _hasAccess == true ? null : const _RestrictedSettingsHelp(),
+        help: access ? null : const _RestrictedSettingsHelp(),
       );
+    }
+    final on = _sms!.appAlerts;
+    return GroupCard(
+      padding: const EdgeInsets.all(Space.l),
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text('Also read payment app notifications', style: context.text.titleMedium),
+          subtitle: const _MutedText('Optional. For payments some banks send no SMS for '
+              '(UPI Lite, wallets, small UPI payments), and clearer shop names.'),
+          value: on,
+          onChanged: _setAppAlerts,
+        ),
+        if (on && !access) ...[
+          const SizedBox(height: Space.s),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              onPressed: CaptureChannel.openNotificationAccessSettings,
+              child: Text('Allow notification access'),
+            ),
+          ),
+          const SizedBox(height: Space.m),
+          const _RestrictedSettingsHelp(),
+        ],
+      ],
+    );
+  }
 
   Widget _notifyStep() => _StepCard(
         number: 2,
@@ -155,7 +277,7 @@ class _HiddenMessagesStep extends StatelessWidget {
     return GroupCard(
       padding: const EdgeInsets.all(Space.l),
       children: [
-        _StepTitle(number: 3, done: done, title: 'Let PaiPai read every bank SMS'),
+        _StepTitle(number: 4, done: done, title: 'Let PaiPai read every bank SMS'),
         const SizedBox(height: Space.s),
         _MutedText(_summary()),
         if (!done) ...[const SizedBox(height: Space.l), ..._fixes(context)],
@@ -315,17 +437,24 @@ class _StepBadge extends StatelessWidget {
 /// Android 13+ blocks notification access for apps installed from a file
 /// until "Allow restricted settings" is turned on in App info.
 class _RestrictedSettingsHelp extends StatelessWidget {
-  const _RestrictedSettingsHelp();
+  /// For SMS, Android shows no prompt at all instead of a greyed-out switch.
+  final bool sms;
+  const _RestrictedSettingsHelp({this.sms = false});
 
   @override
   Widget build(BuildContext context) {
     return _QuietBlock(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Switch greyed out or "Restricted setting"?', style: context.text.titleSmall),
+        Text(sms ? 'Nothing happened when you tapped Allow?' : 'Switch greyed out or "Restricted setting"?',
+            style: context.text.titleSmall),
         const SizedBox(height: Space.xs),
-        const _MutedText('Android blocks this for apps installed from a file. '
-            'Open App info, tap ⋮ (top right) → Allow restricted settings. '
-            'Then come back and tap Allow again. You only do this once.'),
+        _MutedText(sms
+            ? 'Android blocks SMS access for apps installed from a file. Open App info, '
+                'tap ⋮ (top right) → Allow restricted settings, then Permissions → SMS → '
+                'Allow. You only do this once.'
+            : 'Android blocks this for apps installed from a file. '
+                'Open App info, tap ⋮ (top right) → Allow restricted settings. '
+                'Then come back and tap Allow again. You only do this once.'),
         const Align(
           alignment: Alignment.centerLeft,
           child: TextButton(

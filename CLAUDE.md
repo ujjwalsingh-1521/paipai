@@ -1,6 +1,6 @@
 # PaiPai — personal expense tracker
 
-Local-first Android app (Flutter) for tracking expenses and income. All data lives in on-device SQLite. Payment notifications (bank SMS via the Messages app, UPI apps, bank apps, email alerts) are parsed so each payment can be categorised in one tap. Built for personal use, sideloaded as an APK. The Play Store is a possible future target: payment capture uses notification access (allowed for a core feature), and Play also permits SMS access for budget apps after a permissions declaration.
+Local-first Android app (Flutter) for tracking expenses and income. All data lives in on-device SQLite. Bank SMS (read directly, the main source since 1.9.0) and, optionally, payment app notifications (UPI apps, bank apps, email alerts) are parsed so each payment can be categorised in one tap. Built for personal use, sideloaded as an APK. The Play Store is a possible future target: SMS access for budget apps needs Play's permissions declaration, and notification access is allowed for a core feature.
 
 **Status and roadmap live in [`progress.md`](progress.md). Read it at the start of every session, and update it in the same change as any feature or fix.**
 
@@ -10,7 +10,7 @@ Local-first Android app (Flutter) for tracking expenses and income. All data liv
 - State: `flutter_riverpod` (AsyncNotifiers)
 - Storage: `sqflite`, singleton `DatabaseHelper`, schema **v11** (`DatabaseHelper.schemaVersion`), migrations in `onUpgrade`
 - Charts: `fl_chart`
-- Native Kotlin: a `NotificationListenerService` plus a **headless Flutter engine** (`paymentCaptureMain` in `main.dart`) that runs the Dart capture code while the app is closed; MethodChannel `com.expense.expense_tracker/capture`
+- Native Kotlin: an SMS receiver, an optional `NotificationListenerService`, and a **headless Flutter engine** (`paymentCaptureMain` in `main.dart`) that runs the Dart capture code while the app is closed; MethodChannel `com.expense.expense_tracker/capture`
 
 ## Commands
 
@@ -37,7 +37,9 @@ lib/
   models/category_symbol.dart a category's symbol (column `emoji`) is `icon:<name>` from the grouped icon
                             catalog, or any emoji the user typed. Never rename an icon name (it's stored)
   services/capture/         payment_parser (generic, any bank/UPI app), payment_matcher (duplicate
-                            merging), capture_service (save/alert/categorize), capture_channel (native bridge)
+                            merging), capture_service (save/alert/categorize; CaptureMode live/catchUp/import),
+                            capture_channel (native bridge), sms_inbox (catch-up + import, run in the capture
+                            engine), sms_sender (ignore -P promos and phone numbers)
   services/widgets/         WidgetSnapshot (pure, tested) + WidgetSync.push(): call after any data change
   services/budgets/         BudgetCheck.run(): call next to WidgetSync.push after any spending change; alerts each
                             warning level once per budget per month (level reached kept in settings)
@@ -51,8 +53,14 @@ lib/
   widgets/                  shared pieces: entry_row, ui (SectionHeader, GroupCard, EmptyNote), category_chip,
                             category_sheet, edit_entry_sheet, entry_fields, month_switcher
 android/app/src/main/kotlin/com/expense/expense_tracker/
-  PaymentNotificationListener  receives notifications; forwards only ones mentioning money
-  CaptureEngine                starts/holds the headless engine, queues events until Dart is ready
+  SmsCapture                   bank SMS: SmsCaptureReceiver (new SMS), BootReceiver (catch-up after a restart),
+                               readInbox (pages of 500), the scan cursor and the "app notifications too" switch.
+                               SMS reach Dart as app = "sms", title = sender
+  PaymentNotificationListener  receives notifications; forwards only ones mentioning money. With SMS granted it
+                               does nothing unless the user turned app notifications on, and Dart then drops SMS
+                               apps' notifications (smsCaptureActive)
+  CaptureEngine                starts/holds the headless engine, queues events until Dart is ready; deliver()
+                               reports Dart's reply, so receivers finish their goAsync() right after the save
   AlertNotifier                "₹250 paid · Shop [Cat][Cat][More]" alerts; AlertActionReceiver for buttons
   QuickPickActivity            the "More" card: see-through FlutterActivity running `quickPickMain`
                                (lib/screens/quick_pick_app.dart) over the current app
@@ -75,6 +83,11 @@ branding/                   master SVGs + icon generator
 ```bash
 export MSYS_NO_PATHCONV=1   # Git Bash rewrites /sdcard paths otherwise
 P=com.expense.expense_tracker
+# Bank SMS (numeric senders only; alphanumeric ones like AX-HDFCBK-S are covered by unit tests):
+adb emu sms send 5676 "Sent Rs.220.00 from Kotak Bank A/c X1234 to SHOP on 19-10-26. UPI Ref 629300001001"
+# An SMS PaiPai missed (catch-up on next app open), or an old one for Import; no ':' in the body:
+adb shell su 0 content insert --uri content://sms/inbox --bind address:s:JM-KOTAKB-S --bind date:l:<millis> --bind "body:s:'...'"
+# The notification path (without SMS permission, or with app notifications on):
 adb shell cmd notification allow_listener $P/$P.PaymentNotificationListener   # re-run after each install
 adb shell pm grant $P android.permission.POST_NOTIFICATIONS
 # Quote the whole command, or adb splits the text at the first space:
@@ -82,7 +95,8 @@ adb shell "cmd notification post -S bigtext -t 'AX-HDFCBK' tag1 'Rs.250.00 debit
 adb logcat -d | grep PaiPaiCapture
 ```
 
-- Run the emulator with `-no-window` (the user may be using the PC).
+- Run the emulator with a window so the user can watch, unless they say they're busy on the PC (then `-no-window`).
+- `adb root` stops `cmd notification post` from showing anything: use `adb shell su 0 ...` for sqlite3 and `am broadcast` instead.
 - Android 15 replaces many bank-SMS texts with "Sensitive notification content hidden" for PaiPai. To test parsing, run `adb shell cmd appops set --user 0 $P RECEIVE_SENSITIVE_NOTIFICATIONS allow` and re-toggle the listener, or turn off Settings → Notifications → Enhanced notifications.
 - Flutter widgets aren't visible to `uiautomator` text search; tap them by coordinates (screenshots are 1080×2400).
 
@@ -91,6 +105,7 @@ adb logcat -d | grep PaiPaiCapture
 - **Never change `applicationId` / package `com.expense.expense_tracker`.** The display name is "PaiPai"; the ID stays the same. Changing it makes Android treat the build as a new app, and the user's data stays behind in the old one.
 - **Release signing:** `android/key.properties` (gitignored) points to the release keystore, which lives outside the repo. Every release must be signed with this key so it installs over the existing app and keeps its data. The Gradle build fails on purpose if the file is missing. Never regenerate or replace the key.
 - **Bump `version: x.y.z+N` in `pubspec.yaml` once per release (a new feature batch), not for every rebuild.** Fixes to a version that isn't committed yet keep its number: Android installs an APK with the same version over the existing app and keeps the data.
+- **Imported and older caught-up SMS never alert** (`CaptureMode`); they wait on Home, which opens the list when more than 5 wait. Captured payments that happened before the balance was set never move it (`EarlierPayments`, `balanceProvider`).
 - **Never file a payment without the user choosing.** Past choices only order the suggestions (`Suggestions.rank` in capture_service.dart, read from saved entries via `capturedChoices`). The `merchant_mappings` table is unused since 1.3.0 and kept only so old backups restore.
 - **Split payments** are ordinary expense rows sharing `split_id` = the first part's id (the row a capture links to). Always save, change, unsplit and delete them as a whole (`DatabaseHelper.saveSplit/unsplit/deleteSplit`). Lists group them via `LedgerEntry.merge`; the bank balance counts parts by `Expense.recordedId`; never compute the balance from `LedgerEntry` rows (a split row holds only its first part's `Expense`).
 - **Payee and note are separate.** Expenses/income have `payee` (who was paid; set from captured payments) and `notes` (the user's own text). Never store a payee in `notes`.

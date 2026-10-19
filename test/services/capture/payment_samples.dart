@@ -410,6 +410,85 @@ const paymentSamples = <PaymentSample>[
     verified: true,
     expect: SampleExpect(amount: 20.00, direction: 'debit', payee: 'Mohan Pan Bhandar', reference: '627706800001', accountTail: '5678'),
   ),
+  // Source: the user's own phone, 2026-10-14: one ₹60 received, seen four times
+  // (Kotak SMS, SBI UPI SMS, Google Pay at once; the Kotak 811 app 14 min later,
+  // without a reference). Names, a/c and refs changed.
+  PaymentSample(
+    id: 'kotak_sms_received_person',
+    app: _gMessages,
+    title: 'AD-KOTAKB-S',
+    text: 'Received Rs.60.00 in your Kotak Bank AC 5678 from KARAN MEHTA on 14-10-26.UPI Ref:628703011111',
+    verified: true,
+    expect: SampleExpect(amount: 60.00, direction: 'credit', payee: 'Karan', reference: '628703011111', accountTail: '5678'),
+  ),
+  PaymentSample(
+    id: 'sbi_upi_credited_transfer_from',
+    app: _gMessages,
+    title: 'VD-SBIUPI-S',
+    text: 'Dear SBI User, your A/c X5678-credited by Rs.60 on 14Oct26 transfer from KARAN MEHTA Ref No 628703011111 -SBI',
+    verified: true,
+    expect: SampleExpect(amount: 60.00, direction: 'credit', payee: 'Karan', reference: '628703011111', accountTail: '5678'),
+  ),
+  PaymentSample(
+    id: 'gpay_paid_you_via_other_app',
+    app: _gpay,
+    title: 'KARAN MEHTA paid you ₹60.00',
+    text: 'Paid via SuperMoney UPI',
+    verified: true,
+    expect: SampleExpect(amount: 60.00, direction: 'credit', payee: 'Karan'),
+  ),
+  PaymentSample(
+    id: 'kotak811_app_received_person',
+    app: _kotak811,
+    title: '₹60.00 received from KARAN MEHTA',
+    text: 'Amount credited to XX5678. Check out details.',
+    verified: true,
+    expect: SampleExpect(amount: 60.00, direction: 'credit', payee: 'Karan', accountTail: '5678'),
+  ),
+  // Source: the user's own phone, 2026-10-17: one ₹220 payment; the Kotak 811
+  // app alert came 14 min after the SMS, without a reference, and its payee
+  // has an extra word. Names, a/c and refs changed.
+  PaymentSample(
+    id: 'kotak_sms_sent_shop_short_name',
+    app: _gMessages,
+    title: 'JM-KOTAKB-S',
+    text: 'Sent Rs.220.00 from Kotak Bank A/c X5678 to Ganesh Vegitable  on 17-10-26. UPI Ref 629067600001. Not done by you? Tap https://kotak.bank.in/KBANKT/Fraud',
+    verified: true,
+    expect: SampleExpect(amount: 220.00, direction: 'debit', payee: 'Ganesh Vegitable', reference: '629067600001', accountTail: '5678'),
+  ),
+  PaymentSample(
+    id: 'kotak811_app_paid_shop_long_name',
+    app: _kotak811,
+    title: '₹220.00 paid to Ganesh Vegitable shop',
+    text: 'Amount debited from XX5678. Check out details.',
+    verified: true,
+    expect: SampleExpect(amount: 220.00, direction: 'debit', payee: 'Ganesh Vegitable shop', accountTail: '5678'),
+  ),
+  // Source: the user's own phone, 2026-10-16: a loan ad that was saved as a
+  // ₹5,500 expense. Link changed. Ignored for its -P (promotional) sender...
+  PaymentSample(
+    id: 'ignore_sms_meesho_loan_promo',
+    app: _gMessages,
+    title: 'AX-MEESHO-P',
+    text: 'Get a personal loan of Rs. 5,500 on Meesho sent directly to your bank account. Check your offer now: https://ltl.sh/abc123',
+    verified: true,
+  ),
+  // ...and for its wording, from a header without the suffix.
+  PaymentSample(
+    id: 'ignore_sms_loan_promo_no_suffix',
+    app: _gMessages,
+    title: 'AX-MEESHO',
+    text: 'Get a personal loan of Rs. 5,500 on Meesho sent directly to your bank account. Check your offer now: https://ltl.sh/abc123',
+    verified: false,
+  ),
+  // A bank alert forwarded by a friend: from a phone number, so not the user's payment.
+  PaymentSample(
+    id: 'ignore_sms_forwarded_from_person',
+    app: _gMessages,
+    title: '+91 98123 45678',
+    text: 'Sent Rs.500.00 from Kotak Bank A/c X5678 to RAHUL VERMA on 19-10-26. UPI Ref 629200000001. Not done by you? Tap https://kotak.bank.in/KBANKT/Fraud',
+    verified: false,
+  ),
   // Source: the user's own phone, 2026-10-05: a promo from the Kotak 811 app.
   PaymentSample(
     id: 'ignore_kotak811_loan_promo',
@@ -1273,4 +1352,6 @@ const samePaymentGroups = <List<String>>[
   ['axis_upi_debit_blinkit', 'axis_email_upi_debit_blinkit'],
   // ₹100 to Ramesh, ref 627712345999: BHIM + Canara SMS
   ['bhim_sent_ramesh', 'canara_upi_debit_ramesh'],
+  // ₹60 from Karan, ref 628703011111: Kotak SMS + SBI SMS + Google Pay + Kotak 811 (no ref)
+  ['kotak_sms_received_person', 'sbi_upi_credited_transfer_from', 'gpay_paid_you_via_other_app', 'kotak811_app_received_person'],
 ];

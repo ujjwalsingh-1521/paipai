@@ -1,4 +1,5 @@
 import 'package:expense_tracker/models/pending_transaction.dart';
+import 'package:expense_tracker/services/capture/app_kinds.dart';
 import 'package:expense_tracker/services/capture/parsed_payment.dart';
 import 'package:expense_tracker/services/capture/payment_matcher.dart';
 import 'package:expense_tracker/services/capture/payment_parser.dart';
@@ -81,6 +82,48 @@ void main() {
       expect(records.single.merchant, 'Sharma General Store');
     });
 
+    // The user's phone, 2026-10-14: the Kotak 811 app alert came 14 min after the SMS.
+    test('a late bank-app alert without a reference merges by the payer name', () {
+      final records = _capture([
+        _sample('kotak_sms_received_person', _start),
+        _sample('sbi_upi_credited_transfer_from', _start),
+        _sample('gpay_paid_you_via_other_app', _start.add(const Duration(minutes: 1))),
+        _sample('kotak811_app_received_person', _start.add(const Duration(minutes: 14))),
+      ]);
+      expect(records, hasLength(1));
+      expect(records.single.seenCount, 4);
+      expect(records.single.maybeMultiple, isFalse);
+    });
+
+    // The user's phone, 2026-10-17: 14 min late, and the app's payee has an extra word.
+    test('a late bank-app alert merges on the same account even when the names differ', () {
+      final records = _capture([
+        _sample('kotak_sms_sent_shop_short_name', _start),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 14))),
+      ]);
+      expect(records, hasLength(1));
+      expect(records.single.merchant, 'Ganesh Vegitable shop');
+    });
+
+    // The user's phone, 2026-10-13: the app alert for a ₹150 credit came 40 min later.
+    test('a bank-app alert up to 90 min late still merges', () {
+      final records = _capture([
+        _sample('kotak_sms_received_person', _start),
+        _sample('kotak811_app_received_person', _start.add(const Duration(minutes: 40))),
+      ]);
+      expect(records, hasLength(1));
+    });
+
+    test('a late alert joins the closest payment of the same amount', () {
+      final records = _capture([
+        _parse(_sms, 'JM-KOTAKB-S', 'Sent Rs.220.00 from Kotak Bank A/c X5678 to A. UPI Ref 629067600011', _start),
+        _parse(_sms, 'JM-KOTAKB-S', 'Sent Rs.220.00 from Kotak Bank A/c X5678 to B. UPI Ref 629067600012',
+            _start.add(const Duration(minutes: 30))),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 35))),
+      ]);
+      expect(records.map((r) => r.seenCount), [1, 2]);
+    });
+
     test('a late email with the same reference still merges', () {
       final records = _capture([
         _parse(_sms, 'AX-HDFCBK', 'Rs.450.00 debited from A/c XX1234. UPI Ref 412345678901', _start),
@@ -114,6 +157,65 @@ void main() {
       final records = _capture([
         _parse(_sms, 'AX-HDFCBK', 'Rs.300.00 debited from A/c XX1234 at DMART', _start),
         _parse(_sms, 'JD-ICICIT', 'Rs.300.00 debited from A/c XX9876 at DMART', _start.add(const Duration(minutes: 1))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('a bank-app alert two hours after the SMS is a new payment', () {
+      final records = _capture([
+        _sample('kotak_sms_received_person', _start),
+        _sample('kotak811_app_received_person', _start.add(const Duration(hours: 2))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('a late bank-app alert naming someone else is a new payment', () {
+      final records = _capture([
+        _parse(_sms, 'JM-KOTAKB-S', 'Sent Rs.220.00 from Kotak Bank A/c X5678 to Ravi Kumar. UPI Ref 629067600031', _start),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 30))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('a second alert from an app the payment already has is another payment', () {
+      final records = _capture([
+        _sample('kotak_sms_sent_shop_short_name', _start),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 14))),
+        // Half an hour later the bank app alone reports ₹220 more (UPI Lite, no SMS).
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 45))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('bank SMS read by PaiPai itself merge with a late bank-app alert too', () {
+      final records = _capture([
+        _parse(AppKinds.smsSource, 'JM-KOTAKB-S',
+            'Sent Rs.220.00 from Kotak Bank A/c X5678 to Ganesh Vegitable  on 17-10-26. UPI Ref 629067600041', _start),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 14))),
+      ]);
+      expect(records, hasLength(1));
+    });
+
+    test('a late alert from a different account is a new payment', () {
+      final records = _capture([
+        _parse(_sms, 'JM-KOTAKB-S', 'Sent Rs.220.00 from Kotak Bank A/c X9999 to Ganesh Vegitable. UPI Ref 629067600021', _start),
+        _sample('kotak811_app_paid_shop_long_name', _start.add(const Duration(minutes: 14))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('same payee in the same app, without references, far apart in time', () {
+      final records = _capture([
+        _parse(_sms, 'AX-HDFCBK', 'Rs.20.00 debited from A/c XX1234 to CHAI POINT', _start),
+        _parse(_sms, 'AX-HDFCBK', 'Rs.20.00 debited from A/c XX1234 to CHAI POINT', _start.add(const Duration(minutes: 40))),
+      ]);
+      expect(records, hasLength(2));
+    });
+
+    test('same amount, different payees, without references, 30 min apart', () {
+      final records = _capture([
+        _parse(_sms, 'AX-HDFCBK', 'Rs.250.00 debited from A/c XX1234 to CHAI POINT', _start),
+        _parse(_gpay, 'Sharma Store', 'You paid ₹250', _start.add(const Duration(minutes: 30))),
       ]);
       expect(records, hasLength(2));
     });

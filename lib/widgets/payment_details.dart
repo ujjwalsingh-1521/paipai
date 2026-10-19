@@ -24,7 +24,6 @@ class PaymentDetails extends StatefulWidget {
 class _PaymentDetailsState extends State<PaymentDetails> {
   late final Future<PendingTransaction?> _capture =
       DatabaseHelper().getCaptureFor(expenseId: widget.expenseId, incomeId: widget.incomeId);
-  bool _showMessages = false;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +42,6 @@ class _PaymentDetailsState extends State<PaymentDetails> {
 
   Widget _details(PendingTransaction capture) {
     final upiIds = CaptureMessages.upiIds(capture.rawMessage);
-    final more = capture.seenCount - 1;
     return Container(
       padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.s, Space.s),
       decoration: BoxDecoration(
@@ -56,24 +54,52 @@ class _PaymentDetailsState extends State<PaymentDetails> {
         if (capture.upiRef != null) _Row('Transaction ID', capture.upiRef!, copyable: true),
         for (final id in upiIds) _Row('UPI ID', id, copyable: true),
         if (capture.accountTail != null) _Row('Account', 'XX${capture.accountTail}'),
-        _Row('Seen in', AppKinds.label(capture.sourceApp) + (more > 0 ? ' + $more more' : '')),
+        _Row('Seen in', seenIn(capture)),
         _Row('Captured', DateFormat('d MMM yyyy · h:mm a').format(capture.detectedAt)),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _showMessages = !_showMessages),
-            icon: Icon(_showMessages ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-            label: Text(_showMessages
-                ? 'Hide original message${more > 0 ? 's' : ''}'
-                : 'Show original message${more > 0 ? 's' : ''}'),
-          ),
-        ),
-        if (_showMessages) ..._messages(capture),
+        OriginalMessages(capture: capture),
       ]),
     );
   }
+}
 
-  List<Widget> _messages(PendingTransaction capture) {
+/// "Messages (SMS) + 2 more": where a captured payment was seen.
+String seenIn(PendingTransaction capture) {
+  final more = capture.seenCount - 1;
+  return AppKinds.label(capture.sourceApp) + (more > 0 ? ' + $more more' : '');
+}
+
+/// "Show original messages": every alert a captured payment was built from,
+/// with its app, sender and time. Collapsed until tapped.
+class OriginalMessages extends StatefulWidget {
+  final PendingTransaction capture;
+
+  const OriginalMessages({super.key, required this.capture});
+
+  @override
+  State<OriginalMessages> createState() => _OriginalMessagesState();
+}
+
+class _OriginalMessagesState extends State<OriginalMessages> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final plural = widget.capture.seenCount > 1 ? 's' : '';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _open = !_open),
+          icon: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+          label: Text(_open ? 'Hide original message$plural' : 'Show original message$plural'),
+        ),
+      ),
+      if (_open) ..._messages(),
+    ]);
+  }
+
+  List<Widget> _messages() {
+    final capture = widget.capture;
     final muted = context.text.labelMedium?.copyWith(color: context.colors.onSurfaceVariant);
     return [
       for (final message in CaptureMessages.split(capture.rawMessage))

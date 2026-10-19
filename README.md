@@ -2,7 +2,7 @@
 
 **A local-first expense tracker for Android that labels your payments in one tap.**
 
-Every UPI payment, card swipe and bank transfer already sends you a notification. PaiPai reads those notifications (bank SMS, UPI apps, bank apps, email receipts) on your phone and asks one question: *what was this?* Tap a category on the notification and it's filed, without opening the app.
+Every UPI payment, card swipe and bank transfer already sends you a bank SMS. PaiPai reads those messages on your phone and asks one question: *what was this?* Tap a category on the notification and it's filed, without opening the app.
 
 No account. No server. No internet permission. Your data never leaves your phone.
 
@@ -22,10 +22,12 @@ Android 6.0 or newer. Not on the Play Store yet.
 
 ## What it does
 
-- **Automatic payment capture.** Works with any bank or UPI app: bank SMS (through your Messages app), Google Pay, PhonePe, Paytm, bank apps and email receipts. It keeps working while the app is closed.
+- **Automatic payment capture from bank SMS.** Works with any bank, whichever app you pay with. It keeps working while the app is closed, and catches up on SMS that arrived while your phone was off.
+- **Bring in older payments.** Pick a date and PaiPai reads your past bank SMS from then on. They wait to be labelled and don't change your bank balance.
+- **Optional: payment app notifications.** For payments some banks send no SMS for (UPI Lite, wallets, small UPI payments): Google Pay, PhonePe, Paytm, bank apps and email receipts. Without SMS permission, this is how PaiPai captures.
 - **One-tap labelling.** Each payment brings a notification like *"₹250 paid · Swiggy"* with the two categories you usually pick for that shop. Tap one and it's saved. *More* opens a small card over whatever app you're in.
 - **Never files anything on its own.** Past choices only order the suggestions, because the same shop can be groceries one day and a phone charger the next. You always choose.
-- **Duplicates merged.** One payment often sends 2–3 alerts (bank app, SMS, email). They're merged by UPI reference, or by amount and time.
+- **Duplicates merged.** One payment can bring 2–3 alerts (bank SMS, bank app, email). They're merged by UPI reference, or by amount, account and time.
 - **Budgets.** A monthly budget and optional category budgets, with alerts at 80% and 90% (you can change them) and when you go over.
 - **Split payments.** One ₹3,000 supermarket bill can be groceries + snacks + toys.
 - **Live bank balance.** Enter your balance once; it updates with every payment.
@@ -38,7 +40,7 @@ Android 6.0 or newer. Not on the Play Store yet.
 
 - All data is stored in an SQLite database on your phone.
 - The app asks for **no internet permission**, so it can't send anything anywhere.
-- It reads notifications only to find payments; anything that isn't a payment (chats, OTPs, offers) is ignored and not stored.
+- It reads SMS (and, if you turn it on, notifications) only to find payments. Messages from people, ads (`-P` senders), OTPs and offers are ignored and not stored.
 - Backups are plain files that only you handle.
 - The code is right here, so you can check all of this.
 
@@ -49,11 +51,11 @@ PaiPai isn't on the Play Store yet, so Android shows a few warnings for a downlo
 1. **Download** `PaiPai-x.y.z.apk` from [Releases](../../releases/latest) and open it.
 2. **Allow installs** from your browser or Files app when Android asks.
 3. **Play Protect** may say the app is unknown or unsafe (it hasn't seen it on the Play Store). Tap **More details → Install anyway**.
-4. **Open PaiPai** and follow the setup screen. It asks for two things:
+4. **Open PaiPai** and follow the setup screen (Settings → Payment auto-capture). It asks for:
+   - **SMS**, so it can read bank SMS.
    - **Notifications**, so it can show *"₹250 paid"* alerts.
-   - **Notification access**, so it can read payment notifications.
-5. **If Notification access is greyed out** ("Restricted setting"): open **Settings → Apps → PaiPai → ⋮ (top right) → Allow restricted settings**, then turn on Notification access again.
-6. **Android 15:** some bank SMS may show as *"Sensitive notification content hidden"*. The setup screen explains the one-time fix.
+   - Optionally **Notification access**, to also read payment app notifications.
+5. **If nothing happens when you allow SMS, or Notification access is greyed out** ("Restricted setting"): open **Settings → Apps → PaiPai → ⋮ (top right) → Allow restricted settings**. Then allow SMS under **Permissions**, or turn on Notification access again.
 
 **Updating:** install the new APK over the old one. Your data stays.
 

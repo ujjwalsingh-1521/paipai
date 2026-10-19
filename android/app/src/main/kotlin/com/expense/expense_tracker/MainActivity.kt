@@ -20,6 +20,11 @@ class MainActivity : FlutterActivity() {
         AppChannel.onLaunchIntent(intent)
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        AppChannel.onPermissionResult(this, requestCode, grantResults)
+    }
+
     override fun onDestroy() {
         AppChannel.detach(this)
         super.onDestroy()

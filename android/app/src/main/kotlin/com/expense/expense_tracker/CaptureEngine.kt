@@ -25,15 +25,34 @@ object CaptureEngine {
     private var channel: MethodChannel? = null
     private var dartReady = false
 
-    // Events that arrive before the Dart side has set up its handler.
-    private val waiting = ArrayDeque<Pair<String, Any?>>()
+    private class Event(val method: String, val arguments: Any?, val onDone: ((Boolean, Any?) -> Unit)?)
 
-    fun deliver(context: Context, method: String, arguments: Any?) {
+    // Events that arrive before the Dart side has set up its handler.
+    private val waiting = ArrayDeque<Event>()
+
+    /**
+     * [onDone] runs on the main thread once Dart has handled the event
+     * (true, with Dart's reply) or failed (false).
+     */
+    fun deliver(context: Context, method: String, arguments: Any?, onDone: ((Boolean, Any?) -> Unit)? = null) {
         main.post {
             ensureStarted(context.applicationContext)
-            if (dartReady) channel?.invokeMethod(method, arguments)
-            else waiting.addLast(method to arguments)
+            val event = Event(method, arguments, onDone)
+            if (dartReady) send(event) else waiting.addLast(event)
         }
+    }
+
+    private fun send(event: Event) {
+        val channel = channel
+        if (channel == null) {
+            event.onDone?.invoke(false, null)
+            return
+        }
+        channel.invokeMethod(event.method, event.arguments, object : MethodChannel.Result {
+            override fun success(result: Any?) { event.onDone?.invoke(true, result) }
+            override fun error(code: String, message: String?, details: Any?) { event.onDone?.invoke(false, null) }
+            override fun notImplemented() { event.onDone?.invoke(false, null) }
+        })
     }
 
     private fun ensureStarted(context: Context) {
@@ -56,12 +75,9 @@ object CaptureEngine {
         if (call.method == "backgroundReady") {
             Log.i(PaymentNotificationListener.TAG, "capture engine ready, ${waiting.size} waiting")
             dartReady = true
-            while (waiting.isNotEmpty()) {
-                val (method, arguments) = waiting.removeFirst()
-                channel?.invokeMethod(method, arguments)
-            }
+            while (waiting.isNotEmpty()) send(waiting.removeFirst())
             result.success(null)
-        } else if (!AlertNotifier.handle(context, call, result)) {
+        } else if (!AlertNotifier.handle(context, call, result) && !SmsCapture.handle(context, call, result)) {
             result.notImplemented()
         }
     }

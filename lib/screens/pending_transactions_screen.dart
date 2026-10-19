@@ -37,6 +37,20 @@ class PendingTransactionsScreen extends ConsumerWidget {
   Widget _list(WidgetRef ref, List<PendingTransaction> items) => ListView(
         padding: const EdgeInsets.fromLTRB(Space.l, Space.s, Space.l, Space.xxl),
         children: [
+          Builder(
+            builder: (context) => FilledButton.icon(
+              onPressed: () => reviewPendingPayments(context, ref),
+              icon: const Icon(Icons.label_important_rounded),
+              label: const Text('Label one by one'),
+            ),
+          ),
+          const SizedBox(height: Space.s),
+          Builder(
+            builder: (context) => Text("Tap one to label it, or swipe it away if it isn't a payment.",
+                textAlign: TextAlign.center,
+                style: context.text.bodySmall?.copyWith(color: context.colors.onSurfaceVariant)),
+          ),
+          const SizedBox(height: Space.m),
           GroupCard(children: [
             for (var i = 0; i < items.length; i++) ...[
               if (i > 0) const Divider(indent: Space.l, endIndent: Space.l),

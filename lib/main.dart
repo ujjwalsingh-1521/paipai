@@ -84,6 +84,7 @@ class _MainShellState extends ConsumerState<MainShell>
       onOpenScreen: _openScreen,
     );
     WidgetSync.push();
+    CaptureChannel.requestSmsScan();
     WidgetsBinding.instance.addPostFrameCallback((_) => _reviewOnOpen());
   }
 
@@ -101,7 +102,9 @@ class _MainShellState extends ConsumerState<MainShell>
       BackupService().runAutoBackupIfDue();
     }
     if (state == AppLifecycleState.resumed) {
-      // Payments captured while the app was in the background.
+      // Payments captured while the app was in the background, and bank
+      // SMS that came while PaiPai couldn't run.
+      CaptureChannel.requestSmsScan();
       _refreshProviders();
       _reviewOnOpen();
     }
@@ -119,12 +122,13 @@ class _MainShellState extends ConsumerState<MainShell>
     // a tapped notification (launchId) always opens its payment.
     final onMainScreen = mounted && (ModalRoute.of(context)?.isCurrent ?? true);
     if (launchId == null && !onMainScreen) return;
-    await _reviewPayments(startWith: launchId);
+    // Unasked, only recent ones: imported old SMS wait on Home instead.
+    await _reviewPayments(startWith: launchId, recentOnly: true);
   }
 
-  Future<void> _reviewPayments({int? startWith}) async {
+  Future<void> _reviewPayments({int? startWith, bool recentOnly = false}) async {
     if (!mounted) return;
-    await reviewPendingPayments(context, ref, startWith: startWith);
+    await reviewPendingPayments(context, ref, startWith: startWith, recentOnly: recentOnly);
   }
 
   /// First open: "What's your current bank balance?" (skippable, asked once).

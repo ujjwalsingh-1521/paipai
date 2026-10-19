@@ -9,21 +9,27 @@ import '../providers/income_source_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/money.dart';
 import 'category_chip.dart';
+import 'entry_fields.dart';
+import 'payment_details.dart';
 import 'split_editor.dart';
 
 final _dateFormat = DateFormat('dd MMM yyyy · hh:mm a');
 
 enum ReviewResult { saved, notAPayment, later }
 
+const recentReview = Duration(days: 3);
+
 bool _reviewing = false;
 
 /// Shows "What was this?" for each payment not yet labelled, one after
 /// another, until the user picks Later. [startWith] goes first (the payment
-/// a notification was tapped for).
+/// a notification was tapped for). [recentOnly] skips payments older than
+/// [recentReview] (say, imported from old SMS) when asking unprompted.
 Future<void> reviewPendingPayments(
   BuildContext context,
   WidgetRef ref, {
   int? startWith,
+  bool recentOnly = false,
 }) async {
   if (_reviewing) return;
   _reviewing = true;
@@ -33,9 +39,10 @@ Future<void> reviewPendingPayments(
       final pending = await ref
           .read(pendingTransactionProvider.notifier)
           .latest();
+      final cutoff = DateTime.now().subtract(recentReview);
       final tx =
           pending.where((t) => t.id == nextId).firstOrNull ??
-          pending.lastOrNull;
+          pending.where((t) => !recentOnly || t.detectedAt.isAfter(cutoff)).lastOrNull;
       if (tx == null || !context.mounted) return;
       final result = await showPaymentReviewSheet(context, tx);
       if (result == ReviewResult.later) return;
@@ -56,8 +63,10 @@ Future<ReviewResult> showPaymentReviewSheet(
     isScrollControlled: true,
     useSafeArea: true,
     // Scrolls if many categories don't fit on a small screen.
-    builder: (_) => SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.l),
+    builder: (sheetContext) => SingleChildScrollView(
+      // Lifts the sheet above the keyboard while the note is typed.
+      padding: EdgeInsets.fromLTRB(Space.xl, 0, Space.xl,
+          Space.l + MediaQuery.viewInsetsOf(sheetContext).bottom),
       child: _TransactionSheet(transaction: tx),
     ),
   );
@@ -79,11 +88,18 @@ class _TransactionSheetState extends ConsumerState<_TransactionSheet> {
   // Category names, best guess first; null until loaded.
   List<String>? _order;
   bool _saving = false;
+  final _note = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadSuggestions();
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSuggestions() async {
@@ -102,10 +118,18 @@ class _TransactionSheetState extends ConsumerState<_TransactionSheet> {
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
-    await ref
-        .read(pendingTransactionProvider.notifier)
-        .categorize(widget.transaction.id!, _selected!);
-    if (mounted) Navigator.pop(context, ReviewResult.saved);
+    try {
+      await ref
+          .read(pendingTransactionProvider.notifier)
+          .categorize(widget.transaction.id!, _selected!, note: _note.text);
+      if (mounted) Navigator.pop(context, ReviewResult.saved);
+    } catch (error) {
+      // Leave Save usable so the user can try again.
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text('Couldn\'t save: $error')));
+    }
   }
 
   /// [items] in suggestion order (unknown names keep their place at the end).
@@ -166,7 +190,16 @@ class _TransactionSheetState extends ConsumerState<_TransactionSheet> {
             label: const Text('Split across categories'),
           ),
         ),
-      const SizedBox(height: Space.m),
+      const SizedBox(height: Space.s),
+      TextField(
+        controller: _note,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          labelText: 'Note',
+          prefixIcon: Icon(Icons.notes_rounded),
+        ),
+      ),
+      const SizedBox(height: Space.l),
       Row(
         children: [
           Expanded(
@@ -198,7 +231,8 @@ class _TransactionSheetState extends ConsumerState<_TransactionSheet> {
   /// Same card, split view; a picked category becomes the first part.
   Widget _splitEditor() => SplitEditor(
     total: widget.transaction.amount,
-    initial: [if (_selected != null) SplitPart(_selected!, 0)],
+    // The note typed so far goes with the first part.
+    initial: [if (_selected != null) SplitPart(_selected!, 0, note: textOrNull(_note))],
     onCancel: () => setState(() => _splitting = false),
     onSave: (parts) async {
       await ref
@@ -296,6 +330,8 @@ class _Details extends StatelessWidget {
         borderRadius: BorderRadius.circular(Corners.medium),
       ),
       child: Column(
+        // Stretch, so "Show original message" lines up with the rows.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _DetailRow(
             icon: Icons.schedule_rounded,
@@ -314,6 +350,12 @@ class _Details extends StatelessWidget {
               label: 'UPI Ref',
               value: tx.upiRef!,
             ),
+          _DetailRow(
+            icon: Icons.notifications_none_rounded,
+            label: 'Seen in',
+            value: seenIn(tx),
+          ),
+          OriginalMessages(capture: tx),
         ],
       ),
     );

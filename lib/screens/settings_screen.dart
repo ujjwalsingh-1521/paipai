@@ -55,7 +55,7 @@ class SettingsScreen extends ConsumerWidget {
             _Item(
               icon: Icons.notifications_active_rounded,
               title: 'Payment auto-capture',
-              subtitle: 'Pick up payments from bank and UPI alerts',
+              subtitle: 'Pick up payments from bank SMS',
               onTap: () => _open(context, const AutoCaptureScreen()),
             ),
             const _Divider(),
@@ -95,10 +95,11 @@ class SettingsScreen extends ConsumerWidget {
   static String _balanceText(WidgetRef ref) {
     final start = ref.watch(balanceStartProvider).valueOrNull;
     if (start == null) return 'Not set. Tap to set it';
-    final balance = start.currentBalance(
-      ref.watch(expenseProvider).valueOrNull ?? [],
-      ref.watch(incomeProvider).valueOrNull ?? [],
-    );
+    final balance = ref.watch(balanceProvider).valueOrNull ??
+        start.currentBalance(
+          ref.watch(expenseProvider).valueOrNull ?? [],
+          ref.watch(incomeProvider).valueOrNull ?? [],
+        );
     return '${formatMoney(balance)} · tap to correct';
   }
 

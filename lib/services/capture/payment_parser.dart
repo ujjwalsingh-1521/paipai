@@ -1,5 +1,6 @@
 import 'app_kinds.dart';
 import 'parsed_payment.dart';
+import 'sms_sender.dart';
 
 /// Recognises payments in notifications from any bank, card, UPI app or
 /// email alert. It relies on the wording all Indian payment alerts share
@@ -8,6 +9,8 @@ import 'parsed_payment.dart';
 class PaymentParser {
   static ParsedPayment? parse(NotificationInput input) {
     if (AppKinds.isIgnored(input.app)) return null;
+    // An SMS's title is its sender: ads and forwards aren't bank alerts.
+    if (AppKinds.of(input.app) == AppKind.sms && SmsSender.isIgnored(input.title)) return null;
     final text = _combine(input);
     final lower = text.toLowerCase();
     if (_notATransaction.any((pattern) => pattern.hasMatch(lower))) return null;
@@ -67,6 +70,9 @@ class PaymentParser {
         r'\b(?:cashback|discount|off)\s+(?:of\s+)?up\s?to\b'),
     RegExp(r'\bpre-?approved\b|\bloan\s+(?:offer|approved|of\s+up\s?to)\b|\bapply\s+now\b|'
         r'\buse\s+code\b|\bt&c\b|\blimited\s+period\b|\bclaim\s+(?:now|your)\b'),
+    // "Get a personal loan of Rs. 5,500 ... sent directly to your bank account"
+    RegExp(r'\b(?:get|avail|take)\s+(?:an?\s+)?(?:instant\s+|personal\s+|quick\s+)*loan\b|'
+        r'\bloan\s+of\s+(?:up\s?to\s+)?(?:₹|rs\.?|inr)|\bcheck\s+(?:your|the)\s+offer\b'),
     RegExp(r'\bkyc\b'),
     // A card company acknowledging a bill payment: the bank's debit
     // alert already recorded that money leaving.

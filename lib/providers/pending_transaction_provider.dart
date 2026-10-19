@@ -21,8 +21,8 @@ class PendingTransactionNotifier
   Future<List<PendingTransaction>> build() =>
       _db.getAllPendingTransactions(unprocessedOnly: true);
 
-  Future<void> categorize(int id, String category) async {
-    await _capture.categorize(id, category);
+  Future<void> categorize(int id, String category, {String? note}) async {
+    await _capture.categorize(id, category, note: note);
     ref.invalidate(expenseProvider);
     ref.invalidate(incomeProvider);
     await refresh();

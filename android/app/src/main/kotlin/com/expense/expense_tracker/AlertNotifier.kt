@@ -137,9 +137,16 @@ class AlertActionReceiver : BroadcastReceiver() {
             val message = if (saved != null) "Saved $saved to $category" else "Saved to $category"
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
-        CaptureEngine.deliver(context, "onAlertAction", mapOf("pendingId" to id, "category" to category))
-        // Keep the process alive while the capture engine starts and saves.
-        val pending = goAsync()
-        Handler(Looper.getMainLooper()).postDelayed({ pending.finish() }, 8_000)
+        // Keep the process alive while the capture engine starts and saves,
+        // but no longer: Android delivers PaiPai's next broadcast (the next
+        // tap) only after this one finishes.
+        val finish = finishOnce(goAsync())
+        CaptureEngine.deliver(context, "onAlertAction", mapOf("pendingId" to id, "category" to category)) { _, _ -> finish() }
+        Handler(Looper.getMainLooper()).postDelayed(finish, MAX_WAIT_MS)
+    }
+
+    companion object {
+        /** A cold engine start plus the save rarely takes more than a few seconds. */
+        const val MAX_WAIT_MS = 8_000L
     }
 }

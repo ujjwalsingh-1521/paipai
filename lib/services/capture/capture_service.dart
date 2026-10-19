@@ -7,6 +7,7 @@ import '../../models/expense.dart';
 import '../../models/income.dart';
 import '../../models/pending_transaction.dart';
 import '../../models/split_part.dart';
+import 'app_kinds.dart';
 import 'capture_alerts.dart';
 import 'merchant_normalizer.dart';
 import 'parsed_payment.dart';
@@ -33,49 +34,94 @@ class CaptureService {
   CaptureService({required this._alerts, DatabaseHelper? db})
       : _db = db ?? DatabaseHelper();
 
-  Future<void> handleNotification(NotificationInput input) {
-    final next = _queue.then((_) => _handle(input));
+  /// Live alerts ask at once. [CaptureMode.catchUp] and
+  /// [CaptureMode.import] are batches: call [batchDone] after the last one.
+  Future<void> handleNotification(NotificationInput input, {CaptureMode mode = CaptureMode.live}) {
+    final next = _queue.then((_) => _handle(input, mode));
     _queue = next.catchError((_) {});
     return next;
   }
 
-  Future<void> _handle(NotificationInput input) async {
+  /// Once per batch: refresh widgets and budgets, tidy old fingerprints.
+  Future<void> batchDone() {
+    final next = _queue.then((_) async {
+      await _db.pruneProcessedHashes(DateTime.now().subtract(_hashRetention));
+      await _alerts.dataChanged();
+    });
+    _queue = next.catchError((_) {});
+    return next;
+  }
+
+  /// Found by a catch-up scan this soon after it arrived, a payment still
+  /// gets its alert; older ones wait quietly in the app.
+  static const catchUpAlertAge = Duration(hours: 2);
+
+  Future<void> _handle(NotificationInput input, CaptureMode mode) async {
+    if (input.smsCaptureActive && AppKinds.isSmsApp(input.app)) return;
     final payment = PaymentParser.parse(input);
     if (payment == null) return;
     // Android re-posts notifications (updates, regrouping); skip repeats.
     final fingerprint = _fingerprint(input);
     if (await _db.isSmsProcessed(fingerprint)) return;
-    final since = input.postedAt.subtract(PaymentMatcher.lookback);
-    final recent = await _db.getCapturesSince(since);
-    final existing = PaymentMatcher.findSamePayment(payment, recent);
-    if (existing != null) {
-      await _mergeInto(existing, payment);
-    } else {
-      await _recordNew(payment);
+    final recent = await _db.getCapturesBetween(
+        input.postedAt.subtract(PaymentMatcher.lookback), input.postedAt.add(PaymentMatcher.lookback));
+    if (mode == CaptureMode.live || !_alreadyRecorded(input, recent)) {
+      final alert = switch (mode) {
+        CaptureMode.live => true,
+        CaptureMode.catchUp => DateTime.now().difference(input.postedAt) < catchUpAlertAge,
+        CaptureMode.import => false,
+      };
+      final existing = PaymentMatcher.findSamePayment(payment, recent);
+      if (existing != null) {
+        await _mergeInto(existing, payment, alert: alert);
+      } else {
+        await _recordNew(payment, alert: alert);
+      }
     }
     // Marked only after saving, so a failure part-way doesn't lose it.
     await _db.markSmsProcessed(fingerprint);
-    await _db.pruneProcessedHashes(DateTime.now().subtract(_hashRetention));
-    await _alerts.dataChanged();
+    if (mode == CaptureMode.live) {
+      await _db.pruneProcessedHashes(DateTime.now().subtract(_hashRetention));
+      await _alerts.dataChanged();
+    }
   }
+
+  /// An SMS found again by a scan or an import (after its fingerprint was
+  /// pruned): the same sender and text, received at the same moment, are
+  /// already part of a payment. (Two identical SMS minutes apart are two
+  /// payments: two ₹20 chais.)
+  static bool _alreadyRecorded(NotificationInput input, List<PendingTransaction> recent) {
+    if (input.app != AppKinds.smsSource) return false;
+    return recent.any((record) {
+      if (record.detectedAt.difference(input.postedAt).abs() > _sameSmsWindow) return false;
+      final messages = CaptureMessages.split(record.rawMessage);
+      if (record.sender == input.title && messages.first.text == input.text) return true;
+      return messages.skip(1).any((m) => m.text == input.text && (m.heading?.contains(input.title) ?? false));
+    });
+  }
+
+  // Live, an SMS is stamped when the receiver gets it; the inbox stamps it a
+  // moment earlier. (Within 30 days the fingerprint already catches it; this
+  // is for older imports.)
+  static const _sameSmsWindow = Duration(minutes: 2);
 
   static String _fingerprint(NotificationInput input) => sha256
       .convert(utf8.encode('${input.app}|${input.messageId}|${input.text}'))
       .toString();
 
-  Future<void> _mergeInto(PendingTransaction existing, ParsedPayment payment) async {
+  Future<void> _mergeInto(PendingTransaction existing, ParsedPayment payment, {required bool alert}) async {
     final merged = PaymentMatcher.merge(existing, payment);
     await _db.updatePendingTransaction(merged);
-    if (!merged.isProcessed) {
+    if (alert && !merged.isProcessed) {
       await _alerts.showReview(merged, await suggestionsFor(merged), update: true);
     }
   }
 
-  Future<void> _recordNew(ParsedPayment payment) async {
+  Future<void> _recordNew(ParsedPayment payment, {required bool alert}) async {
     final pending = _toPending(payment);
     final id = await _db.insertPendingTransaction(pending);
     final saved = pending.copyWith(id: id);
-    await _alerts.showReview(saved, await suggestionsFor(saved));
+    if (alert) await _alerts.showReview(saved, await suggestionsFor(saved));
   }
 
   PendingTransaction _toPending(ParsedPayment payment) => PendingTransaction(
@@ -122,10 +168,11 @@ class CaptureService {
 
   // --- Answers from the notification buttons or the in-app sheet ---
 
-  Future<void> categorize(int pendingId, String category) async {
+  /// [note] is the user's own text; the payee stays in `payee`.
+  Future<void> categorize(int pendingId, String category, {String? note}) async {
     final tx = await _db.getPendingTransaction(pendingId);
     if (tx == null || tx.isProcessed) return;
-    await _saveAs(tx, category);
+    if (!await _saveAs(tx, category, note)) return;
     await _alerts.cancel(pendingId);
     await _alerts.dataChanged();
   }
@@ -139,8 +186,7 @@ class CaptureService {
     if (error != null) throw ArgumentError(error);
     final payment = Expense(
         amount: tx.amount, category: parts.first.category, date: tx.detectedAt, payee: tx.merchant);
-    final leadId = await _db.saveSplit(payment, parts);
-    await _db.markTransactionProcessed(pendingId, expenseId: leadId);
+    if (!await _db.saveCapturedSplit(pendingId, payment, parts)) return;
     await _alerts.cancel(pendingId);
     await _alerts.dataChanged();
   }
@@ -173,18 +219,29 @@ class CaptureService {
     await _alerts.dataChanged();
   }
 
-  Future<void> _saveAs(PendingTransaction tx, String category) async {
-    final id = tx.id!;
-    if (tx.isDebit) {
-      final expenseId = await _db.insertExpense(Expense(
-          amount: tx.amount, category: category, date: tx.detectedAt, payee: tx.merchant));
-      await _db.markTransactionProcessed(id, expenseId: expenseId);
-    } else {
-      final incomeId = await _db.insertIncome(Income(
-          amount: tx.amount, source: category, date: tx.detectedAt, payee: tx.merchant));
-      await _db.markTransactionProcessed(id, incomeId: incomeId);
-    }
+  /// False if another tap or screen saved this payment first.
+  Future<bool> _saveAs(PendingTransaction tx, String category, String? note) {
+    final notes = (note?.trim().isEmpty ?? true) ? null : note!.trim();
+    return tx.isDebit
+        ? _db.saveCapturedEntry(tx.id!,
+            expense: Expense(
+                amount: tx.amount, category: category, date: tx.detectedAt, payee: tx.merchant, notes: notes))
+        : _db.saveCapturedEntry(tx.id!,
+            income: Income(
+                amount: tx.amount, source: category, date: tx.detectedAt, payee: tx.merchant, notes: notes));
   }
+}
+
+/// How a message reached the capture code.
+enum CaptureMode {
+  /// Just arrived (an SMS or a notification): alert now.
+  live,
+
+  /// Found in the SMS inbox after PaiPai couldn't run (phone off, app killed).
+  catchUp,
+
+  /// Old SMS the user chose to bring in: never alert.
+  import,
 }
 
 /// Ordered category names for one payment. [usual] is set when the payee
